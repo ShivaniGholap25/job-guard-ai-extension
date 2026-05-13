@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Job Guard</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+
+  <div class="card">
+
+    <!-- ── Header ─────────────────────────────────────── -->
+    <div class="header">
+      <h1>🛡️ Job Guard</h1>
+      <p class="subtitle">Scan before you trust⚡</p>
+    </div>
+
+    <!-- ── Input area ─────────────────────────────────── -->
+    <textarea
+      id="jobText"
+      placeholder="Paste job message here..."
+      aria-label="Job offer message"
+    ></textarea>
+
+    <!-- ── Analyze button ─────────────────────────────── -->
+    <button id="analyzeBtn">Analyze</button>
+
+    <!-- ── Loading indicator (hidden by default) ──────── -->
+    <p id="loading" class="loading hidden">Analyzing...</p>
+
+    <!-- ── Result card (hidden by default) ───────────── -->
+    <div id="result" class="result-card hidden" aria-live="polite">
+
+      <!-- Risk label badge -->
+      <span id="badge" class="badge"></span>
+
+      <!-- Numeric score -->
+      <p id="score" class="score-text"></p>
+
+      <!-- Reasons section -->
+      <p class="reasons-title">Why is this suspicious?</p>
+      <ul id="reasons" class="reasons-list"></ul>
+
+      <!-- AI explanation (hidden until response arrives) -->
+      <div id="explanation-box" style="display:none; margin-top:12px">
+        <p style="font-weight:600; font-size:13px; margin-bottom:6px">🤖 AI Analysis</p>
+        <p id="explanation-text" style="background:#f8f8f8; border-radius:8px;
+           padding:12px; font-size:13px; color:#444; line-height:1.7;
+           font-style:italic; margin:0"></p>
+      </div>
+
+    </div>
+
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
