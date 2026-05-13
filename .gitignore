@@ -1,5 +1,6 @@
 # Environment variables — never commit real API keys
 job-guard/backend/.env
+.env
 
 # Python
 __pycache__/
