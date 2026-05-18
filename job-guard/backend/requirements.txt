@@ -9,3 +9,6 @@ nltk
 numpy
 validators
 tldextract
+streamlit
+plotly
+pandas
