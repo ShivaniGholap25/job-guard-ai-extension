@@ -20,6 +20,9 @@ from api.predict import predictor
 # ── Scam Risk Scoring Engine ─────────────────────────────────
 from security.scam_score import score_text
 
+# ── Phishing / URL Detection Engine ──────────────────────────
+from security.phishing_detector import analyze_url, analyze_text_for_urls
+
 # ── App initialization ───────────────────────────────────────
 app = FastAPI(
     title="Job Guard API",
@@ -63,6 +66,32 @@ class RiskScoreResponse(BaseModel):
     risk_level: str            # "LOW" | "MEDIUM" | "HIGH"
     reasons:    list[str]      # triggered signal descriptions
     breakdown:  dict[str, int] # per-dimension points for transparency
+
+class CheckUrlRequest(BaseModel):
+    url: str           # single URL to analyse for phishing indicators
+
+class CheckUrlResponse(BaseModel):
+    url:         str
+    is_phishing: bool
+    risk_level:  str            # "LOW" | "MEDIUM" | "HIGH"
+    risk_score:  int            # 0–100
+    reasons:     list[str]
+    breakdown:   dict[str, int]
+
+class ScanTextUrlsRequest(BaseModel):
+    text: str          # free text — all URLs inside will be analysed
+
+class UrlScanSummary(BaseModel):
+    url:         str
+    is_phishing: bool
+    risk_level:  str
+    risk_score:  int
+    reasons:     list[str]
+
+class ScanTextUrlsResponse(BaseModel):
+    urls_found:      int
+    phishing_count:  int
+    results:         list[UrlScanSummary]
 
 
 # ============================================================
@@ -355,4 +384,63 @@ def risk_score(payload: RiskScoreRequest):
         risk_level=result.risk_level,
         reasons=result.reasons,
         breakdown=result.breakdown,
+    )
+
+
+# ── Single URL phishing check ────────────────────────────────
+@app.post("/check-url", response_model=CheckUrlResponse)
+def check_url(payload: CheckUrlRequest):
+    """
+    Analyse a single URL for phishing and malicious indicators.
+
+    Detection layers:
+      - HTTP (no TLS)
+      - IP-address-based host
+      - URL shortener services
+      - Excessive hyphens in domain
+      - Suspicious / high-abuse TLDs (.tk .ml .xyz etc.)
+      - Deceptive subdomains (brand impersonation)
+      - Typosquatting / lookalike domains
+      - Excessive URL length
+      - Suspicious path keywords (login, verify, otp, joining-fee…)
+
+    Returns risk_score (0–100), risk_level (LOW/MEDIUM/HIGH),
+    is_phishing flag, reasons, and per-check breakdown.
+    """
+    result = analyze_url(payload.url)
+    return CheckUrlResponse(
+        url=result.url,
+        is_phishing=result.is_phishing,
+        risk_level=result.risk_level,
+        risk_score=result.risk_score,
+        reasons=result.reasons,
+        breakdown=result.breakdown,
+    )
+
+
+# ── Bulk URL scan from free text ─────────────────────────────
+@app.post("/scan-urls", response_model=ScanTextUrlsResponse)
+def scan_text_urls(payload: ScanTextUrlsRequest):
+    """
+    Extract every URL from a job description / message and analyse
+    each one for phishing indicators in a single call.
+
+    Useful for scanning a full job post without manually extracting URLs.
+    Returns a summary count plus per-URL results.
+    """
+    results = analyze_text_for_urls(payload.text)
+    summaries = [
+        UrlScanSummary(
+            url=r.url,
+            is_phishing=r.is_phishing,
+            risk_level=r.risk_level,
+            risk_score=r.risk_score,
+            reasons=r.reasons,
+        )
+        for r in results
+    ]
+    return ScanTextUrlsResponse(
+        urls_found=len(results),
+        phishing_count=sum(1 for r in results if r.is_phishing),
+        results=summaries,
     )
