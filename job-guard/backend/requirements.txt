@@ -1,5 +1,8 @@
 fastapi
 uvicorn
-python-dotenv
-groq
 python-multipart
+groq
+python-dotenv
+scikit-learn
+nltk
+numpy

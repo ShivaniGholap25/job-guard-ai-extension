@@ -6,7 +6,7 @@ import os
 import re
 
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from groq import Groq
 from pydantic import BaseModel
@@ -14,11 +14,14 @@ from pydantic import BaseModel
 # Load environment variables from .env file
 load_dotenv()
 
+# ── NLP predictor (lazy-loads model on first request) ────────
+from api.predict import predictor
+
 # ── App initialization ───────────────────────────────────────
 app = FastAPI(
     title="Job Guard API",
     description="Fake Job Offer Detector backend",
-    version="0.2.0",
+    version="0.3.0",
 )
 
 # ── CORS middleware ──────────────────────────────────────────
@@ -40,6 +43,14 @@ class AnalyzeResponse(BaseModel):
     label: str           # "Low Risk" | "Medium Risk" | "High Risk"
     reasons: list[str]   # human-readable signals that influenced the score
     explanation: str     # AI-generated plain-English explanation
+
+class PredictRequest(BaseModel):
+    job_description: str  # raw job description text for NLP classification
+
+class PredictResponse(BaseModel):
+    prediction: str    # "Genuine" | "Suspicious" | "Fake"
+    confidence: float  # 0.0–100.0 percentage
+    reason: str        # human-readable explanation of the prediction
 
 
 # ============================================================
@@ -275,3 +286,36 @@ def analyze_job_offer(payload: AnalyzeRequest):
         reasons=reasons,
         explanation=explanation,
     )
+
+
+# ── NLP prediction endpoint ──────────────────────────────────
+@app.post("/predict", response_model=PredictResponse)
+def predict_job(payload: PredictRequest):
+    """
+    NLP-based fake job classifier using TF-IDF + Logistic Regression.
+
+    Runs the trained ML model on the job description and returns:
+    - prediction  : Genuine / Suspicious / Fake
+    - confidence  : model confidence as a percentage (0–100)
+    - reason      : specific signal or template explanation
+
+    Requires trained model files in backend/models/.
+    Run `python -m training.train_model` first if models are missing.
+    """
+    try:
+        result = predictor.predict(payload.job_description)
+        return PredictResponse(
+            prediction=result.prediction,
+            confidence=result.confidence,
+            reason=result.reason,
+        )
+    except FileNotFoundError as e:
+        raise HTTPException(
+            status_code=503,
+            detail=str(e),
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Prediction failed: {str(e)}",
+        )
