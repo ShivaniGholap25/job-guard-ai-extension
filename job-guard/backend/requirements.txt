@@ -3,6 +3,7 @@ uvicorn
 python-multipart
 groq
 python-dotenv
+pydantic-settings
 scikit-learn
 nltk
 numpy
