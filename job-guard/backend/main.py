@@ -17,6 +17,9 @@ load_dotenv()
 # ── NLP predictor (lazy-loads model on first request) ────────
 from api.predict import predictor
 
+# ── Scam Risk Scoring Engine ─────────────────────────────────
+from security.scam_score import score_text
+
 # ── App initialization ───────────────────────────────────────
 app = FastAPI(
     title="Job Guard API",
@@ -51,6 +54,15 @@ class PredictResponse(BaseModel):
     prediction: str    # "Genuine" | "Suspicious" | "Fake"
     confidence: float  # 0.0–100.0 percentage
     reason: str        # human-readable explanation of the prediction
+
+class RiskScoreRequest(BaseModel):
+    text: str          # raw job offer text to score
+
+class RiskScoreResponse(BaseModel):
+    risk_score: int            # 0–100 composite scam risk score
+    risk_level: str            # "LOW" | "MEDIUM" | "HIGH"
+    reasons:    list[str]      # triggered signal descriptions
+    breakdown:  dict[str, int] # per-dimension points for transparency
 
 
 # ============================================================
@@ -319,3 +331,28 @@ def predict_job(payload: PredictRequest):
             status_code=500,
             detail=f"Prediction failed: {str(e)}",
         )
+
+
+# ── Scam Risk Scoring endpoint ───────────────────────────────
+@app.post("/risk-score", response_model=RiskScoreResponse)
+def risk_score(payload: RiskScoreRequest):
+    """
+    Dynamic Scam Risk Scoring Engine.
+
+    Evaluates the job text across five independent risk dimensions:
+      1. suspicious_keywords  — payment requests, urgency, vague claims  (+20 max)
+      2. fake_email_domain    — personal/free email domains               (+25)
+      3. unrealistic_salary   — salary far above fresher market rate      (+15 max)
+      4. phishing_url         — URL shorteners, IP links, typosquatting   (+30 max)
+      5. missing_company_info — no verifiable employer details            (+20)
+
+    Returns composite risk_score (0–100), risk_level (LOW/MEDIUM/HIGH),
+    human-readable reasons, and a per-dimension breakdown.
+    """
+    result = score_text(payload.text)
+    return RiskScoreResponse(
+        risk_score=result.risk_score,
+        risk_level=result.risk_level,
+        reasons=result.reasons,
+        breakdown=result.breakdown,
+    )
